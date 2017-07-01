@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<android.support.constraint.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    tools:context="com.example.mark.ble_test3.discovery">
+
+    <EditText
+        android:id="@+id/debug_trace"
+        android:layout_width="363dp"
+        android:layout_height="215dp"
+        android:ems="10"
+        android:inputType="none"
+        android:textColor="@android:color/black"
+        android:textColorLink="@android:color/darker_gray"
+        tools:layout_editor_absoluteX="24dp"
+        tools:layout_editor_absoluteY="16dp" />
+
+    <Button
+        android:id="@+id/start_discovery"
+        style="@android:style/Widget.DeviceDefault.Button"
+        android:layout_width="0dp"
+        android:layout_height="55dp"
+        android:backgroundTint="@color/colorAccent"
+        android:onClick="start_discovery"
+        android:text="Find Trix"
+        android:layout_marginLeft="8dp"
+        app:layout_constraintLeft_toLeftOf="parent"
+        app:layout_constraintBottom_toBottomOf="parent"
+        android:layout_marginBottom="11dp"
+        android:layout_marginRight="8dp"
+        app:layout_constraintRight_toRightOf="parent"
+        android:layout_marginStart="8dp"
+        android:layout_marginEnd="8dp"
+        app:layout_constraintHorizontal_bias="0.5" />
+
+    <ToggleButton
+        android:id="@+id/trix_on_off"
+        android:layout_width="395dp"
+        android:layout_height="100dp"
+        android:layout_marginBottom="8dp"
+        android:layout_marginTop="8dp"
+        android:text="ToggleButton"
+        android:visibility="invisible"
+        app:layout_constraintBottom_toTopOf="@+id/start_discovery"
+        app:layout_constraintTop_toBottomOf="@+id/debug_trace"
+        tools:layout_editor_absoluteX="8dp" />
+
+</android.support.constraint.ConstraintLayout>

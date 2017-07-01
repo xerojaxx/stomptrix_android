@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">ble_test3</string>
+    <string name="title_activity_scan_results">scan_results</string>
+</resources>
