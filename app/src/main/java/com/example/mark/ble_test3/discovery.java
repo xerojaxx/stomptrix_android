@@ -55,12 +55,8 @@ import android.widget.Toast;
 class BLEScanCallback extends ScanCallback {
     private static final String TAG = "ScanCB";
 
-    private TextView debug_out;
-    public List<ScanResult> results  = new ArrayList<ScanResult>();
 
-    BLEScanCallback(TextView debug) {
-        this.debug_out = debug;
-    }
+    public List<ScanResult> results  = new ArrayList<ScanResult>();
 
     public void clear_results()
     {
@@ -80,54 +76,45 @@ class BLEScanCallback extends ScanCallback {
             }
         }
 
-        Log.d(TAG, "Result");
-        debug_out.append("----------------\r\n");
-        debug_out.append("callbackType" + String.valueOf(callbackType) + "\r\n");
-        debug_out.append("result" + result.toString() + "\r\n");
+        Log.d(TAG, "Result" + result.toString());
         results.add(result);
-
-
     }
 
     @Override
     public void onBatchScanResults(List<ScanResult> results) {
         for (ScanResult sr : results) {
-            debug_out.append("ScanResult - Results" + sr.toString() + "\r\n");
+            Log.d(TAG, "ScanResult - batch results" + sr.toString());
         }
     }
 
     @Override
     public void onScanFailed(int errorCode) {
-        debug_out.append("Scan Failed" + "Error Code: " + errorCode + "\r\n");
+        Log.e(TAG, "Scan Failed" + "Error Code: " + errorCode);
     }
 }
 
-class ble_gatt_controller extends BluetoothGattCallback {
-
-    public List<BluetoothGattCharacteristic> characteristics;
-
-    public List<String> service_names;
-
-
+class ble_gatt_controller extends BluetoothGattCallback
+{
+    private static final String TAG = "GATT_CB";
     private Handler mHandler;
-
     ble_gatt_controller(Handler handler) {
         this.mHandler = handler;
     }
 
     @Override
-    public void onConnectionStateChange(BluetoothGatt gatt, int status, int newState) {
-        //debug_out.append("onConnectionStateChange Status: " + status + "\r\n");
-        switch (newState) {
+    public void onConnectionStateChange(BluetoothGatt gatt, int status, int newState)
+    {
+        switch (newState)
+        {
             case BluetoothProfile.STATE_CONNECTED:
-                //debug_out.append("gattCallback STATE_CONNECTED" + "\r\n");
+                Log.d(TAG, "gattCallback STATE_CONNECTED");
                 gatt.discoverServices();
                 break;
             case BluetoothProfile.STATE_DISCONNECTED:
-                //debug_out.append("gattCallback STATE_DISCONNECTED\r\n");
+                Log.d(TAG, "gattCallback STATE_DISCONNECTED");
                 break;
             default:
-                //debug_out.append("gattCallback STATE_OTHER\r\n");
+
         }
 
     }
@@ -139,17 +126,6 @@ class ble_gatt_controller extends BluetoothGattCallback {
         Message msg = new Message();
         msg.obj = "Services discovered";
         mHandler.sendMessage(msg);
-        //debug_out.append("onServicesDisccovered" + "\r\n");
-//        int service_index = 0;
-//
-//        for (BluetoothGattService gattService : services) {
-//            service_names.add("Device has service: " + getServiceName(gattService.getUuid()));
-//            characteristics.addCharacteristics(gatt, gattService.getCharacteristics());
-//            Timber.d("==========================\n");
-//        }
-
-
-        //gatt.readCharacteristic(services.get(1).getCharacteristics().get(0));
     }
 
     @Override
@@ -173,17 +149,25 @@ class ble_gatt_controller extends BluetoothGattCallback {
 
 }
 
-public class discovery extends Activity{
+public class discovery extends Activity
+{
+    private static final String TAG = "Disc";
 
     private static final short STOMP_SERVICE_ID = 0x1815;
     private static final short STOMP_CHAR_BATTERY = 0x2A19;
     private static final short STOMP_CHAR_COLOUR = 0x2A20;
 
-    private TextView debug_text;
+
     private BluetoothAdapter mBluetoothAdapter;
+    private BluetoothGatt mGatt;
+    private ble_gatt_controller mgatt_controller;
     private BluetoothLeScanner mLEScanner;
-    private boolean currently_scanning;
+    private BLEScanCallback mScanCallback;
+
     private SparseArray<BluetoothDevice> mDevices;
+    private boolean currently_scanning;
+    private ToggleButton trix_tog_btn;
+
     private Handler mHandler = new Handler()
     {
         @Override
@@ -192,19 +176,19 @@ public class discovery extends Activity{
             if (msg.obj instanceof BluetoothGattCharacteristic)
             {
                 BluetoothGattCharacteristic charac = (BluetoothGattCharacteristic)msg.obj;
-                debug_print(charac.toString());
+                Log.d(TAG, charac.toString());
                 byte[] value = charac.getValue();
                 int battery_mv = 0;
                 for (byte i = 0; i < value.length; i++ )
                 {
                     battery_mv += value[i] * (i * 256);
                 }
-                debug_print(String.format("Battery_mv: %d", battery_mv));
+                Log.d(TAG, String.format("Battery_mv: %d", battery_mv));
             }
             else
             {
                 String cmd = (String) msg.obj;
-                debug_print(cmd);
+                Log.d(TAG, cmd);
                 super.handleMessage(msg);
 
                 if (cmd == "Services discovered") {
@@ -214,16 +198,12 @@ public class discovery extends Activity{
         }
     };
 
-    private BluetoothGatt mGatt;
-    private ble_gatt_controller mgatt_controller;
-    private BLEScanCallback mScanCallback;
-    private ToggleButton trix_tog_btn;
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_discovery);
-        debug_text = (TextView) findViewById(R.id.debug_trace);
         currently_scanning = false;
 
         Button start_discovery = (Button) findViewById(R.id.start_discovery);
@@ -242,7 +222,7 @@ public class discovery extends Activity{
             }
         });
 
-        mScanCallback = new BLEScanCallback(debug_text);
+        mScanCallback = new BLEScanCallback();
         mgatt_controller = new ble_gatt_controller(mHandler);
 
         LocationManager lm = (LocationManager)getSystemService(LOCATION_SERVICE);
@@ -273,7 +253,7 @@ public class discovery extends Activity{
         }
         else
         {
-            debug_print("BT adapter is ON.");
+            Log.d(TAG, "BT adapter is ON.");
         }
 
         /*
@@ -302,16 +282,16 @@ public class discovery extends Activity{
                 currently_scanning = true;
                 mLEScanner.startScan(filters, settings, mScanCallback);
                 mHandler.postDelayed(mStopRunnable, 2000);
-                debug_print("LE Scanner started.");
+                Log.d(TAG, "LE Scanner started.");
             }
             else
             {
-                debug_print("already scanning.");
+                Log.d(TAG, "already scanning.");
             }
         }
         else
         {
-            debug_print("SDK version not supported.");
+            Log.d(TAG, "SDK version not supported.");
             finish();
         }
     }
@@ -323,9 +303,8 @@ public class discovery extends Activity{
     private void stopScan() {
         mLEScanner.stopScan(mScanCallback);
         currently_scanning = false;
-        debug_print("LE scan stopped (timed out)");
-
-        debug_print(String.format("Found %d device/s", mScanCallback.results.size()));
+        Log.d(TAG, "LE scan stopped (timed out)");
+        Log.d(TAG, String.format("Found %d device/s", mScanCallback.results.size()));
 
         if ( !mScanCallback.results.isEmpty())
         {
@@ -372,15 +351,11 @@ public class discovery extends Activity{
 
     private BluetoothGattCharacteristic find_stomptrix_char(short uuid_to_find){
         BluetoothGattService stomptrix_service = find_stomptrix_service();
-
         if ( stomptrix_service != null)
         {
             for (BluetoothGattCharacteristic next_char:stomptrix_service.getCharacteristics())
             {
-
                 short char_id = (short) ((long) next_char.getUuid().getMostSignificantBits() >> 32);
-                debug_print(String.format("CHAR uuid: %04x.", char_id));
-
                 if(uuid_to_find == char_id)
                 {
                     return next_char;
@@ -396,15 +371,12 @@ public class discovery extends Activity{
         BluetoothGattService stomptrix_service = mGatt.getService(STOMPTRIX_SERVICE_UUID);//find_stomptrix_service();//
         if ( stomptrix_service != null)
         {
-            debug_print("Found steptrix service!!");
-
+            Log.d(TAG, "Found steptrix service!!");
             ToggleButton trix_tog_btn = (ToggleButton) findViewById(R.id.trix_on_off);
             trix_tog_btn.setVisibility(View.VISIBLE);
 
             BluetoothGattCharacteristic battery_char = find_stomptrix_char(STOMP_CHAR_BATTERY);
-
             UUID STOMP_CHAR_COLOUR_UUID = new UUID(0x2A2000001000L ,0x800000805F9B34FBL);
-
             BluetoothGattCharacteristic colour_char = stomptrix_service.getCharacteristic(STOMP_CHAR_COLOUR_UUID);//find_stomptrix_char(STOMP_CHAR_COLOUR);
 //            if (battery_char != null)
 //            {
@@ -430,22 +402,22 @@ public class discovery extends Activity{
 
                 if (mGatt.writeCharacteristic(colour_char))
                 {
-                    debug_print("write char sent.");
+                    Log.d(TAG, "write char sent.");
                 }
                 else
                 {
-                    debug_print("write char failed to start.");
-                    debug_print(String.format("permissions: %4x", colour_char.getPermissions()));
+                    Log.d(TAG, "write char failed to start.");
+                    Log.d(TAG, String.format("permissions: %4x", colour_char.getPermissions()));
                 }
             }
 //            BluetoothGattCharacteristic charac = stomptrix_service.getCharacteristics().get(0);
 //            if (mGatt.readCharacteristic(charac))
 //            {
-//                debug_print("Read char sent.");
+//                Log.d(TAG, "Read char sent.");
 //            }
 //            else
 //            {
-//                debug_print("Read char failed to start.");
+//                Log.d(TAG, "Read char failed to start.");
 //            }
 
         }
@@ -460,7 +432,7 @@ public class discovery extends Activity{
             if (data.hasExtra("selected_device_index"))
             {
                 int device_index = data.getExtras().getInt("selected_device_index");
-                debug_print(String.format("selected index %d", device_index));
+                Log.d(TAG, String.format("selected index %d", device_index));
                 BluetoothDevice btDevice = mScanCallback.results.get(device_index).getDevice();
                 connectToDevice(btDevice);
             }
@@ -471,11 +443,6 @@ public class discovery extends Activity{
     protected void trix_toggle_on_off(boolean btn_state)
     {
         process_discovered_services();
-    }
-
-
-    private void debug_print(String text) {
-        debug_text.append(text + "\r\n");
     }
 
 }
