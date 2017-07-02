@@ -2,6 +2,7 @@ package com.example.mark.ble_test3;
 
 import android.app.Activity;
 import android.Manifest;
+import android.content.Context;
 import android.os.Bundle;
 import android.os.Build;
 import android.os.Handler;
@@ -13,6 +14,8 @@ import android.view.View;
 
 
 import android.widget.Button;
+import android.widget.FrameLayout;
+import android.widget.LinearLayout;
 import android.widget.ToggleButton;
 import android.widget.TextView;
 
@@ -93,12 +96,59 @@ class BLEScanCallback extends ScanCallback {
     }
 }
 
-class ble_gatt_controller extends BluetoothGattCallback
+class trix_controller extends BluetoothGattCallback
 {
     private static final String TAG = "GATT_CB";
-    private Handler mHandler;
-    ble_gatt_controller(Handler handler) {
-        this.mHandler = handler;
+    private static final short STOMP_SERVICE_ID = 0x1815;
+    private static final short STOMP_CHAR_BATTERY = 0x2A19;
+    private static final short STOMP_CHAR_COLOUR = 0x2A20;
+
+    private BluetoothDevice mBt_device;
+    private BluetoothGatt mGatt;
+    private Context mContext;
+
+    public boolean device_connected = false;
+
+    trix_controller(BluetoothDevice device, Context context) {
+        this.mBt_device = device;
+        this.mContext = context;
+    }
+
+    public String getAddress(){
+        return mBt_device.getAddress();
+    }
+
+    public void connect(){
+        if (mGatt == null) {
+            mGatt = mBt_device.connectGatt(mContext, true, this);
+        }
+    }
+
+    private BluetoothGattService find_stomptrix_service(){
+        List<BluetoothGattService> services = mGatt.getServices();
+        for (BluetoothGattService service: services) {
+            short service_id = (short) ((long) service.getUuid().getMostSignificantBits() >> 32);
+            if (service_id == STOMP_SERVICE_ID)
+            {
+                return service;
+            }
+        }
+        return null;
+    }
+    private BluetoothGattCharacteristic find_stomptrix_char(short uuid_to_find){
+        BluetoothGattService stomptrix_service = find_stomptrix_service();
+        if ( stomptrix_service != null)
+        {
+            for (BluetoothGattCharacteristic next_char:stomptrix_service.getCharacteristics())
+            {
+                short char_id = (short) ((long) next_char.getUuid().getMostSignificantBits() >> 32);
+                if(uuid_to_find == char_id)
+                {
+                    return next_char;
+                }
+            }
+        }
+        return null;
     }
 
     @Override
@@ -112,20 +162,22 @@ class ble_gatt_controller extends BluetoothGattCallback
                 break;
             case BluetoothProfile.STATE_DISCONNECTED:
                 Log.d(TAG, "gattCallback STATE_DISCONNECTED");
+                device_connected = false;
                 break;
             default:
-
         }
-
     }
 
     @Override
     public void onServicesDiscovered(BluetoothGatt gatt, int status) {
-        List<BluetoothGattService> services = gatt.getServices();
-
-        Message msg = new Message();
-        msg.obj = "Services discovered";
-        mHandler.sendMessage(msg);
+        UUID STOMPTRIX_SERVICE_UUID = new UUID(0x181500001000L, 0x800000805F9B34FBL);
+        BluetoothGattService stomptrix_service = mGatt.getService(STOMPTRIX_SERVICE_UUID);//find_stomptrix_service();//
+        if (stomptrix_service != null) {
+            Log.d(TAG, "Found steptrix service!!");
+            device_connected = true;
+        } else {
+            Log.e(TAG, "Not a stomptrix device!!");
+        }
     }
 
     @Override
@@ -134,7 +186,7 @@ class ble_gatt_controller extends BluetoothGattCallback
                                              characteristic, int status) {
         Message msg = new Message();
         msg.obj = characteristic;
-        mHandler.sendMessage(msg);
+        //mHandler.sendMessage(msg);
         //this.characteristics.add(characteristic);
         //debug_out.append("onCharacteristicRead" + characteristic.toString() + "\r\n");
 //        if (characteristic. == 0x2A19)
@@ -143,7 +195,89 @@ class ble_gatt_controller extends BluetoothGattCallback
 //        }
         //gatt.disconnect();
     }
+    public void toggle_leds_on_off()
+    {
+        final byte LED_SET_STATIC_COLOUR = 0x01;
+        if(!device_connected)
+        {
+            Log.d(TAG, "Device not connected yet.");
+            return;
+        }
 
+//            ToggleButton trix_tog_btn = (ToggleButton) findViewById(R.id.trix_on_off);
+//            trix_tog_btn.setVisibility(View.VISIBLE);
+
+            //BluetoothGattCharacteristic battery_char = find_stomptrix_char(STOMP_CHAR_BATTERY);
+        UUID STOMPTRIX_SERVICE_UUID = new UUID(0x181500001000L, 0x800000805F9B34FBL);
+        BluetoothGattService stomptrix_service = mGatt.getService(STOMPTRIX_SERVICE_UUID);
+        UUID STOMP_CHAR_COLOUR_UUID = new UUID(0x2A2000001000L ,0x800000805F9B34FBL);
+        BluetoothGattCharacteristic colour_char = stomptrix_service.getCharacteristic(STOMP_CHAR_COLOUR_UUID);//find_stomptrix_char(STOMP_CHAR_COLOUR);
+//            if (battery_char != null)
+//            {
+//                if (mGatt.readCharacteristic(battery_char))
+//                {
+//                    debug_print("Read char sent.");
+//                }
+//                else
+//                {
+//                    debug_print("Read char failed to start.");
+//                    debug_print(String.format("permissions: %4x", colour_char.getPermissions()));
+//                }
+//            }
+        if (colour_char != null)
+        {
+
+            ByteBuffer b = ByteBuffer.allocate(4);
+            b.putInt(0x00FF0000);
+
+            byte[] new_colour = b.array();
+
+            colour_char.setValue(new_colour);
+
+            if (mGatt.writeCharacteristic(colour_char))
+            {
+                Log.d(TAG, "write char sent.");
+            }
+            else
+            {
+                Log.d(TAG, "write char failed to start.");
+                Log.d(TAG, String.format("permissions: %4x", colour_char.getPermissions()));
+            }
+        }
+//            BluetoothGattCharacteristic charac = stomptrix_service.getCharacteristics().get(0);
+//            if (mGatt.readCharacteristic(charac))
+//            {
+//                Log.d(TAG, "Read char sent.");
+//            }
+//            else
+//            {
+//                Log.d(TAG, "Read char failed to start.");
+//            }
+
+    }
+}
+
+class stomptrix
+{
+    private static final String TAG = "STOMPTRIX";
+    public trix_controller mController;
+    public Button mBtn;
+
+    stomptrix(trix_controller controller, Button btn)
+    {
+        mBtn = btn;
+        mController = controller;
+
+        btn.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                Log.d(TAG, String.format("ONCLICK: %d", v.getId()));
+                Log.d(TAG, mController.getAddress());
+
+                mController.toggle_leds_on_off();
+            }
+        });
+    }
 
 
 
@@ -153,20 +287,13 @@ public class discovery extends Activity
 {
     private static final String TAG = "Disc";
 
-    private static final short STOMP_SERVICE_ID = 0x1815;
-    private static final short STOMP_CHAR_BATTERY = 0x2A19;
-    private static final short STOMP_CHAR_COLOUR = 0x2A20;
-
+    public List<stomptrix> trixs = new ArrayList<stomptrix>();
 
     private BluetoothAdapter mBluetoothAdapter;
-    private BluetoothGatt mGatt;
-    private ble_gatt_controller mgatt_controller;
     private BluetoothLeScanner mLEScanner;
     private BLEScanCallback mScanCallback;
 
-    private SparseArray<BluetoothDevice> mDevices;
     private boolean currently_scanning;
-    private ToggleButton trix_tog_btn;
 
     private Handler mHandler = new Handler()
     {
@@ -192,13 +319,11 @@ public class discovery extends Activity
                 super.handleMessage(msg);
 
                 if (cmd == "Services discovered") {
-                    process_discovered_services();
+                    //process_discovered_services();
                 }
             }
         }
     };
-
-
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -214,16 +339,7 @@ public class discovery extends Activity
             }
         });
 
-        trix_tog_btn = (ToggleButton) findViewById(R.id.trix_on_off);
-        trix_tog_btn.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                trix_toggle_on_off(trix_tog_btn.isChecked());
-            }
-        });
-
         mScanCallback = new BLEScanCallback();
-        mgatt_controller = new ble_gatt_controller(mHandler);
 
         LocationManager lm = (LocationManager)getSystemService(LOCATION_SERVICE);
         boolean gps_enabled = lm.isProviderEnabled(LocationManager.GPS_PROVIDER);
@@ -239,12 +355,12 @@ public class discovery extends Activity
 
         BluetoothManager manager = (BluetoothManager) getSystemService(BLUETOOTH_SERVICE);
         mBluetoothAdapter = manager.getAdapter();
-        mDevices = new SparseArray<BluetoothDevice>();
 
         ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.ACCESS_COARSE_LOCATION}, 1);
     }
 
     protected void start_ble_disocvery(){
+
         if (mBluetoothAdapter == null || !mBluetoothAdapter.isEnabled()) {
             // Bluetooth is disabled.
             Intent enableBtIntent = new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE);
@@ -332,96 +448,24 @@ public class discovery extends Activity
     };
 
     private void connectToDevice(BluetoothDevice device) {
-        if (mGatt == null) {
-            mGatt = device.connectGatt(this, true, mgatt_controller);
-        }
-    }
-
-    private BluetoothGattService find_stomptrix_service(){
-        List<BluetoothGattService> services = mGatt.getServices();
-        for (BluetoothGattService service: services) {
-            short service_id = (short) ((long) service.getUuid().getMostSignificantBits() >> 32);
-            if (service_id == STOMP_SERVICE_ID)
-            {
-                return service;
-            }
-        }
-        return null;
-    }
-
-    private BluetoothGattCharacteristic find_stomptrix_char(short uuid_to_find){
-        BluetoothGattService stomptrix_service = find_stomptrix_service();
-        if ( stomptrix_service != null)
+        for(stomptrix trix:trixs)
         {
-            for (BluetoothGattCharacteristic next_char:stomptrix_service.getCharacteristics())
+            if( trix.mController.getAddress() == device.getAddress())
             {
-                short char_id = (short) ((long) next_char.getUuid().getMostSignificantBits() >> 32);
-                if(uuid_to_find == char_id)
-                {
-                    return next_char;
-                }
+                Toast.makeText(this, "This device was already added.", Toast.LENGTH_SHORT).show();
+                return;
             }
         }
-        return null;
-    }
+        trix_controller new_trix_controller = new trix_controller(device, this);
 
-    private void process_discovered_services(){
-        UUID STOMPTRIX_SERVICE_UUID = new UUID(0x181500001000L ,0x800000805F9B34FBL);
+        FrameLayout trix_viewer_layout = (FrameLayout)findViewById(R.id.trix_viewer_layout);
+        Button btn = new Button(this);
+        btn.setText(new_trix_controller.getAddress());
+        trix_viewer_layout.addView(btn);
 
-        BluetoothGattService stomptrix_service = mGatt.getService(STOMPTRIX_SERVICE_UUID);//find_stomptrix_service();//
-        if ( stomptrix_service != null)
-        {
-            Log.d(TAG, "Found steptrix service!!");
-            ToggleButton trix_tog_btn = (ToggleButton) findViewById(R.id.trix_on_off);
-            trix_tog_btn.setVisibility(View.VISIBLE);
-
-            BluetoothGattCharacteristic battery_char = find_stomptrix_char(STOMP_CHAR_BATTERY);
-            UUID STOMP_CHAR_COLOUR_UUID = new UUID(0x2A2000001000L ,0x800000805F9B34FBL);
-            BluetoothGattCharacteristic colour_char = stomptrix_service.getCharacteristic(STOMP_CHAR_COLOUR_UUID);//find_stomptrix_char(STOMP_CHAR_COLOUR);
-//            if (battery_char != null)
-//            {
-//                if (mGatt.readCharacteristic(battery_char))
-//                {
-//                    debug_print("Read char sent.");
-//                }
-//                else
-//                {
-//                    debug_print("Read char failed to start.");
-//                    debug_print(String.format("permissions: %4x", colour_char.getPermissions()));
-//                }
-//            }
-            if (colour_char != null)
-            {
-
-                ByteBuffer b = ByteBuffer.allocate(4);
-                b.putInt(0x00AA5544);
-
-                byte[] new_colour = b.array();
-
-                colour_char.setValue(new_colour);
-
-                if (mGatt.writeCharacteristic(colour_char))
-                {
-                    Log.d(TAG, "write char sent.");
-                }
-                else
-                {
-                    Log.d(TAG, "write char failed to start.");
-                    Log.d(TAG, String.format("permissions: %4x", colour_char.getPermissions()));
-                }
-            }
-//            BluetoothGattCharacteristic charac = stomptrix_service.getCharacteristics().get(0);
-//            if (mGatt.readCharacteristic(charac))
-//            {
-//                Log.d(TAG, "Read char sent.");
-//            }
-//            else
-//            {
-//                Log.d(TAG, "Read char failed to start.");
-//            }
-
-        }
-
+        stomptrix new_stomptrix = new stomptrix(new_trix_controller, btn);
+        trixs.add(new_stomptrix);
+        new_stomptrix.mController.connect();
     }
 
     @Override
@@ -442,7 +486,7 @@ public class discovery extends Activity
 
     protected void trix_toggle_on_off(boolean btn_state)
     {
-        process_discovered_services();
+       // process_discovered_services();
     }
 
 }
